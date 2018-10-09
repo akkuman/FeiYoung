@@ -14,33 +14,34 @@ type
 
   TForm1 = class(TForm)
     btnClick2Login: TButton;
-    btnGetLocalIP: TButton;
     DCP_rc4_1: TDCP_rc4;
     edtAuthKey: TEdit;
     edtMachineCode: TEdit;
-    edtLocalIP: TEdit;
-    edtUsername: TEdit;
     edtPassword: TEdit;
+    edtUsername: TEdit;
     grpInfo: TGroupBox;
     grpAuthConfig: TGroupBox;
     grpLoginInfoConfig: TGroupBox;
     lblInfo: TLabel;
     lblAuthKey: TLabel;
     lblMachineCode: TLabel;
-    lblLocalIP: TLabel;
     lblPassword: TLabel;
     lblUsername: TLabel;
     procedure btnClick2LoginClick(Sender: TObject);
-    procedure btnGetLocalIPClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
     function getTodayOfMonth():Integer;
     function encryptPassword(password:string):string;
     procedure getRedirectURL(base_url:string);
-    procedure getLocalIP();
+    procedure getLoginURL();
+    procedure loginAction(username:string; password:string);
   private
 
   public
     var
       redirectURL: string;
+      loginURL: string;
+      loginINFO: string;
+      logoffURL: string;
   end;
 
 var
@@ -54,12 +55,20 @@ implementation
 
 procedure TForm1.btnClick2LoginClick(Sender: TObject);
 begin
-  ShowMessage(encryptPassword(self.edtPassword.Text));
+  if (self.edtUsername.Text<>'') and (self.edtPassword.Text<>'') then
+    loginAction(self.edtUsername.Text, self.edtPassword.Text)
+  else
+    begin
+      self.lblInfo.Caption:='请输入账号和密码';
+      Exit;
+    end;
+  self.lblInfo.Caption:=self.loginINFO;
+
 end;
 
-procedure TForm1.btnGetLocalIPClick(Sender: TObject);
+procedure TForm1.FormCreate(Sender: TObject);
 begin
-  getRedirectURL('http://59.37.96.63:80');
+
 end;
 
 function TForm1.getTodayOfMonth(): Integer;
@@ -132,29 +141,93 @@ end;
 
 procedure TForm1.getRedirectURL(base_url: string);
 var
+  //SS: TStringStream;
   html: string;
+  //statuscode: array[1..3] of Integer = (200, 301, 302);
+begin
+  //SS := TStringStream.Create('');
+  with TFPHttpClient.Create(Nil) do
+  begin
+    try
+      //AllowRedirect := false;
+      html := Post(base_url);
+      //KeepConnection := true;
+      //AddHeader('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36');
+      //HTTPMethod('Get', base_url, SS, statuscode);
+      if ResponseStatusCode = 302 then
+        self.redirectURL := Trim(ResponseHeaders.Values['Location']);
+    finally
+      Free;
+    end;
+  end;
+end;
+
+procedure TForm1.getLoginURL();
+var
+  re: TRegExpr;
+  html: string;
+  url: string;
 begin
   with TFPHttpClient.Create(Nil) do
   begin
     try
-      AllowRedirect := false;
-      html := Get(base_url);
+      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      url := self.redirectURL + '&aidcauthtype=0';
+      html := Post(url);
       if ResponseStatusCode = 200 then
-        self.lblInfo.Caption := '已联网，请勿再次登录'
-      else
-        self.redirectURL := GetHeader('Location');
+        begin
+          re := TRegExpr.Create('\<LoginURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LoginURL\>');
+          if re.Exec(html) then
+            self.loginURL := re.Match[1];
+        end;
     finally
       Free;
     end;
-    //Writeln('Got : ',html);
   end;
 end;
 
-procedure TForm1.getLocalIP();
+procedure TForm1.loginAction(username: string; password: string);
 var
   re: TRegExpr;
+  html: string;
+  formdata: TStrings;
 begin
-  re := TRegExpr.Create('');
+  // 获取登录地址
+  getRedirectURL('http://59.37.96.63:80');
+  if Length(self.redirectURL)=0 then
+    begin
+      self.lblInfo.Caption := '已联网，请勿再次登录';
+      Exit;
+    end;
+  getLoginURL();
+  if Length(self.loginURL)=0 then
+    Exit;
+
+  // 构造formdata
+  formdata := TStringList.Create;
+  formdata.Values['UserName'] := '!^Maod0' + username;
+  formdata.Values['Password'] := encryptPassword(password);
+  formdata.Values['createAuthorFlag'] := '0';
+
+  // 登录
+  with TFPHttpClient.Create(Nil) do
+  begin
+    try
+      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      html := FormPost(self.loginURL, formdata);
+      if ResponseStatusCode = 200 then
+        begin
+          re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
+          if re.Exec(html) then
+            self.loginINFO := re.Match[1];
+          re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
+          if re.Exec(html) then
+            self.logoffURL := re.Match[1];
+        end;
+    finally
+      Free;
+    end;
+  end;
 end;
 
 end.
