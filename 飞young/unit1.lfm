@@ -45,6 +45,7 @@ object Form1: TForm1
       Height = 25
       Top = 32
       Width = 157
+      OnChange = edtAuthKeyChange
       TabOrder = 1
     end
   end
@@ -94,6 +95,7 @@ object Form1: TForm1
     Top = 232
     Width = 105
     Caption = '登录'
+    Enabled = False
     OnClick = btnClick2LoginClick
     TabOrder = 1
   end
@@ -121,6 +123,7 @@ object Form1: TForm1
     Top = 232
     Width = 104
     Caption = '登出'
+    Enabled = False
     OnClick = btnClick2LogoffClick
     TabOrder = 4
   end

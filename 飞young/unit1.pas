@@ -30,6 +30,7 @@ type
     lblUsername: TLabel;
     procedure btnClick2LoginClick(Sender: TObject);
     procedure btnClick2LogoffClick(Sender: TObject);
+    procedure edtAuthKeyChange(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     function getTodayOfMonth():Integer;
     function encryptPassword(password:string):string;
@@ -38,15 +39,16 @@ type
     procedure loginAction(username:string; password:string);
     procedure logoffAction(logoff_url:string);
     procedure showInfoFromINI(filename:string);
+    procedure updateINI(filename:string);
+    function verifyKey(key:string):Boolean;
   private
-
+    redirectURL: string;
+    loginURL: string;
+    loginINFO: string;
+    logoffURL: string;
+    logoffINFO: string;
   public
-    var
-      redirectURL: string;
-      loginURL: string;
-      loginINFO: string;
-      logoffURL: string;
-      logoffINFO: string;
+
   end;
 
 var
@@ -60,15 +62,21 @@ implementation
 
 procedure TForm1.btnClick2LoginClick(Sender: TObject);
 begin
-  if (self.edtUsername.Text<>'') and (self.edtPassword.Text<>'') then
-    loginAction(self.edtUsername.Text, self.edtPassword.Text)
-  else
+  if verifyKey(self.edtAuthKey.Text) then
     begin
-      self.lblInfo.Caption:='请输入账号和密码';
-      Exit;
-    end;
-  self.lblInfo.Caption:=self.loginINFO;
+      if (self.edtUsername.Text<>'') and (self.edtPassword.Text<>'') then
+        loginAction(self.edtUsername.Text, self.edtPassword.Text)
+      else
+        begin
+          self.lblInfo.Caption:='请输入账号和密码';
+          Exit;
+        end;
+      self.lblInfo.Caption:=self.loginINFO;
+    end
+  else
+    self.lblInfo.Caption:='授权失败';
 
+  updateINI('config.ini');
 end;
 
 procedure TForm1.btnClick2LogoffClick(Sender: TObject);
@@ -80,9 +88,18 @@ begin
         self.lblInfo.Caption := self.logoffINFO
       else
         self.lblInfo.Caption := '登出失败';
-    end;
+    end
   else
     self.lblInfo.Caption := '登出失败';
+end;
+
+procedure TForm1.edtAuthKeyChange(Sender: TObject);
+begin
+  if verifyKey(self.edtAuthKey.Text) then
+    begin
+      self.btnClick2Login.Enabled:=True;
+      self.btnClick2Logoff.Enabled:=True;
+    end;
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -91,7 +108,8 @@ begin
 end;
 
 function TForm1.getTodayOfMonth(): Integer;
-  Var YY,MM,DD : Word;
+var
+  YY,MM,DD : Word;
 begin
   DeCodeDate (Date,YY,MM,DD);
   Result := DD;
@@ -150,29 +168,24 @@ begin
   en_size := Sizeof(byte)*Length(enRC4byte);
   // 加密
   rc4cipher := TDCP_rc4.Create(nil);
-  rc4cipher.Init(key, Sizeof(key) * 8, nil);
-  rc4cipher.Encrypt(Pbytearray(bytes_password)^, Pbytearray(enRC4byte)^, en_size);
-  en_password := MD5Print(MD5Buffer(Pbytearray(enRC4byte)^, en_size));
-  rc4cipher.Free;
+  try
+    rc4cipher.Init(key, Sizeof(key) * 8, nil);
+    rc4cipher.Encrypt(Pbytearray(bytes_password)^, Pbytearray(enRC4byte)^, en_size);
+    en_password := MD5Print(MD5Buffer(Pbytearray(enRC4byte)^, en_size));
+  finally
+    rc4cipher.Burn;
+    rc4cipher.Free;
+  end;
 
   Result := en_password;
 end;
 
 procedure TForm1.getRedirectURL(base_url: string);
-var
-  //SS: TStringStream;
-  html: string;
-  //statuscode: array[1..3] of Integer = (200, 301, 302);
 begin
-  //SS := TStringStream.Create('');
   with TFPHttpClient.Create(Nil) do
   begin
     try
-      //AllowRedirect := false;
-      html := Post(base_url);
-      //KeepConnection := true;
-      //AddHeader('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36');
-      //HTTPMethod('Get', base_url, SS, statuscode);
+      Post(base_url);
       if ResponseStatusCode = 302 then
         self.redirectURL := Trim(ResponseHeaders.Values['Location']);
     finally
@@ -198,6 +211,7 @@ begin
           re := TRegExpr.Create('\<LoginURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LoginURL\>');
           if re.Exec(html) then
             self.loginURL := re.Match[1];
+          re.Free;
         end;
     finally
       Free;
@@ -242,9 +256,11 @@ begin
           re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
           if re.Exec(html) then
             self.logoffURL := re.Match[1];
+          re.Free;
         end;
     finally
       Free;
+      formdata.Free;
     end;
   end;
 end;
@@ -263,6 +279,7 @@ begin
           re := TRegExpr.Create('\<LogoffReply\>([\s\S]+?)\<\/LogoffReply\>');
           if re.Exec(html) then
             self.logoffINFO:=re.Match[1];
+          re.Free;
         end;
     finally
       Free;
@@ -290,6 +307,43 @@ begin
   finally
     INI.Free;
   end;
+end;
+
+procedure TForm1.updateINI(filename: string);
+const
+  ASECTION = 'General';
+var
+  INI: TINIFile;
+begin
+  INI := TINIFile.Create(filename);
+  try
+    INI.WriteString(ASECTION, 'username', self.edtUsername.Text);
+    INI.WriteString(ASECTION, 'password', self.edtPassword.Text);
+    INI.WriteString(ASECTION, 'key', self.edtAuthKey.Text);
+    INI.WriteString(ASECTION, 'logoff', self.logoffURL);
+    INI.UpdateFile;
+  finally
+    INI.Free;
+  end;
+end;
+
+function TForm1.verifyKey(key: string): Boolean;
+var
+  rc4Key: string;
+  Encrypted: string;
+begin
+  Result := false;
+ rc4Key := '6D2E24B63283CF34024399F7827A2D00';
+ with TDCP_rc4.Create(nil) do
+ try
+  Init(rc4Key[1], Length(rc4Key) * 8, nil);
+  if length(key)<>0 then
+    if self.edtUsername.Text = DecryptString(key) then
+      Result := true;
+ finally
+   Burn;
+   Free;
+ end;
 end;
 
 end.
