@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, DCPrc4, md5, Forms, Controls, Graphics,
-  Dialogs, StdCtrls, fphttpclient, RegExpr;
+  Dialogs, StdCtrls, IniFiles, fphttpclient, RegExpr;
 
 type
 
@@ -14,6 +14,7 @@ type
 
   TForm1 = class(TForm)
     btnClick2Login: TButton;
+    btnClick2Logoff: TButton;
     DCP_rc4_1: TDCP_rc4;
     edtAuthKey: TEdit;
     edtMachineCode: TEdit;
@@ -28,12 +29,15 @@ type
     lblPassword: TLabel;
     lblUsername: TLabel;
     procedure btnClick2LoginClick(Sender: TObject);
+    procedure btnClick2LogoffClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     function getTodayOfMonth():Integer;
     function encryptPassword(password:string):string;
     procedure getRedirectURL(base_url:string);
     procedure getLoginURL();
     procedure loginAction(username:string; password:string);
+    procedure logoffAction(logoff_url:string);
+    procedure showInfoFromINI(filename:string);
   private
 
   public
@@ -42,6 +46,7 @@ type
       loginURL: string;
       loginINFO: string;
       logoffURL: string;
+      logoffINFO: string;
   end;
 
 var
@@ -66,9 +71,23 @@ begin
 
 end;
 
+procedure TForm1.btnClick2LogoffClick(Sender: TObject);
+begin
+  if Length(self.logoffURL)<>0 then
+    begin
+      logoffAction(self.logoffURL);
+      if Length(self.logoffINFO)<>0 then
+        self.lblInfo.Caption := self.logoffINFO
+      else
+        self.lblInfo.Caption := '登出失败';
+    end;
+  else
+    self.lblInfo.Caption := '登出失败';
+end;
+
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-
+  showInfoFromINI('config.ini');
 end;
 
 function TForm1.getTodayOfMonth(): Integer;
@@ -227,6 +246,49 @@ begin
     finally
       Free;
     end;
+  end;
+end;
+
+procedure TForm1.logoffAction(logoff_url: string);
+var
+  html: string;
+  re: TRegExpr;
+begin
+  with TFPHttpClient.Create(Nil) do
+  begin
+    try
+      Get(logoff_url);
+      if ResponseStatusCode = 200 then
+        begin
+          re := TRegExpr.Create('\<LogoffReply\>([\s\S]+?)\<\/LogoffReply\>');
+          if re.Exec(html) then
+            self.logoffINFO:=re.Match[1];
+        end;
+    finally
+      Free;
+    end;
+  end;
+end;
+
+procedure TForm1.showInfoFromINI(filename: string);
+const
+  ASECTION = 'General';
+var
+  INI: TINIFile;
+  username, password, key: string;
+begin
+  INI := TINIFile.Create(filename);
+  try
+    username := INI.ReadString(ASECTION, 'username', '');
+    password := INI.ReadString(ASECTION, 'password', '');
+    key      := INI.ReadString(ASECTION, 'key', '');
+    self.logoffURL := INI.ReadString(ASECTION, 'logoff', '');
+
+    self.edtUsername.Text := username;
+    self.edtPassword.Text := password;
+    self.edtAuthKey.Text  := key;
+  finally
+    INI.Free;
   end;
 end;
 
