@@ -1,0 +1,148 @@
+object Form1: TForm1
+  Left = 278
+  Height = 287
+  Top = 189
+  Width = 232
+  Caption = 'FeiYoung'
+  ClientHeight = 287
+  ClientWidth = 232
+  LCLVersion = '1.8.4.0'
+  object grpLoginInfoConfig: TGroupBox
+    Left = 7
+    Height = 120
+    Top = 0
+    Width = 218
+    Caption = '登录配置'
+    ClientHeight = 98
+    ClientWidth = 214
+    TabOrder = 0
+    object edtUsername: TEdit
+      Left = 45
+      Height = 25
+      Top = 0
+      Width = 160
+      TabOrder = 0
+    end
+    object lblUsername: TLabel
+      Left = 8
+      Height = 17
+      Top = 5
+      Width = 24
+      Caption = '账号'
+      ParentColor = False
+    end
+    object edtPassword: TEdit
+      Left = 45
+      Height = 25
+      Top = 32
+      Width = 160
+      TabOrder = 1
+    end
+    object lblPassword: TLabel
+      Left = 8
+      Height = 17
+      Top = 37
+      Width = 24
+      Caption = '密码'
+      ParentColor = False
+    end
+    object edtLocalIP: TEdit
+      Left = 45
+      Height = 25
+      Top = 64
+      Width = 160
+      TabOrder = 2
+    end
+    object lblLocalIP: TLabel
+      Left = 8
+      Height = 17
+      Top = 68
+      Width = 11
+      Caption = 'IP'
+      ParentColor = False
+    end
+  end
+  object grpAuthConfig: TGroupBox
+    Left = 7
+    Height = 88
+    Top = 120
+    Width = 218
+    Caption = '授权配置'
+    ClientHeight = 66
+    ClientWidth = 214
+    TabOrder = 1
+    object lblMachineCode: TLabel
+      Left = 8
+      Height = 17
+      Top = 4
+      Width = 29
+      Caption = 'code'
+      ParentColor = False
+    end
+    object edtMachineCode: TEdit
+      Left = 48
+      Height = 25
+      Top = 0
+      Width = 157
+      TabOrder = 0
+    end
+    object lblAuthKey: TLabel
+      Left = 8
+      Height = 17
+      Top = 36
+      Width = 20
+      Caption = 'key'
+      ParentColor = False
+    end
+    object edtAuthKey: TEdit
+      Left = 48
+      Height = 25
+      Top = 32
+      Width = 157
+      TabOrder = 1
+    end
+  end
+  object btnClick2Login: TButton
+    Left = 112
+    Height = 25
+    Top = 256
+    Width = 113
+    Caption = '登录'
+    OnClick = btnClick2LoginClick
+    TabOrder = 2
+  end
+  object grpInfo: TGroupBox
+    Left = 8
+    Height = 48
+    Top = 208
+    Width = 218
+    Caption = '信息'
+    ClientHeight = 26
+    ClientWidth = 214
+    TabOrder = 3
+    object lblInfo: TLabel
+      Left = 8
+      Height = 17
+      Top = 0
+      Width = 121
+      Caption = '联系QQ: 1075768094'
+      ParentColor = False
+    end
+  end
+  object btnGetLocalIP: TButton
+    Left = 7
+    Height = 25
+    Top = 256
+    Width = 113
+    Caption = '获取IP'
+    OnClick = btnGetLocalIPClick
+    TabOrder = 4
+  end
+  object DCP_rc4_1: TDCP_rc4
+    Id = 19
+    Algorithm = 'RC4'
+    MaxKeySize = 2048
+    left = 192
+    top = 112
+  end
+end
