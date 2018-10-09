@@ -1,0 +1,65 @@
+object Form1: TForm1
+  Left = 276
+  Height = 229
+  Top = 154
+  Width = 320
+  Caption = '飞young算号器'
+  ClientHeight = 229
+  ClientWidth = 320
+  LCLVersion = '1.8.4.0'
+  object Label1: TLabel
+    Left = 16
+    Height = 17
+    Top = 16
+    Width = 24
+    Caption = '账号'
+    ParentColor = False
+  end
+  object edtUsername: TEdit
+    Left = 56
+    Height = 25
+    Top = 16
+    Width = 248
+    TabOrder = 0
+  end
+  object Label2: TLabel
+    Left = 16
+    Height = 17
+    Top = 52
+    Width = 20
+    Caption = 'key'
+    ParentColor = False
+  end
+  object mmoKey: TMemo
+    Left = 56
+    Height = 90
+    Top = 56
+    Width = 248
+    TabOrder = 1
+  end
+  object btnEncryptKey: TButton
+    Left = 16
+    Height = 25
+    Top = 159
+    Width = 288
+    Caption = '算号'
+    OnClick = btnEncryptKeyClick
+    TabOrder = 2
+  end
+  object btnDecryptKey: TButton
+    Left = 16
+    Height = 25
+    Top = 192
+    Width = 288
+    Caption = '解号'
+    OnClick = btnDecryptKeyClick
+    TabOrder = 3
+  end
+  object DCP_rc4_1: TDCP_rc4
+    Id = 19
+    Algorithm = 'RC4'
+    MaxKeySize = 2048
+    left = 16
+    top = 120
+  end
+end

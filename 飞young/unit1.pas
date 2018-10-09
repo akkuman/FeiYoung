@@ -269,16 +269,22 @@ procedure TForm1.logoffAction(logoff_url: string);
 var
   html: string;
   re: TRegExpr;
+  logoff_code: string;
 begin
   with TFPHttpClient.Create(Nil) do
   begin
     try
-      Get(logoff_url);
+      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      html := Get(logoff_url);
       if ResponseStatusCode = 200 then
         begin
-          re := TRegExpr.Create('\<LogoffReply\>([\s\S]+?)\<\/LogoffReply\>');
+          re := TRegExpr.Create('\<ResponseCode\>(\S+?)\<\/ResponseCode\>');
           if re.Exec(html) then
-            self.logoffINFO:=re.Match[1];
+            begin
+              logoff_code := re.Match[1];
+              if logoff_code = '150' then
+                self.logoffINFO := logoff_code + ' 登出成功';
+            end;
           re.Free;
         end;
     finally
@@ -330,7 +336,6 @@ end;
 function TForm1.verifyKey(key: string): Boolean;
 var
   rc4Key: string;
-  Encrypted: string;
 begin
   Result := false;
  rc4Key := '6D2E24B63283CF34024399F7827A2D00';
