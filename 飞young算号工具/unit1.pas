@@ -68,6 +68,8 @@ end;
 function TForm1.encryptKey(username: string): string;
 var
   rc4Key: string;
+  Fn: String;
+  F: TextFile;
 begin
   Result := '';
   rc4Key := '6D2E24B63283CF34024399F7827A2D00';
@@ -75,9 +77,18 @@ begin
   try
     Init(rc4Key[1], Length(rc4Key) * 8, nil);
     Result := EncryptString(MD5Print(MD5String(username)));
+    Fn := './paid.csv';
+    AssignFile(F, Fn);
+    if FileExists(Fn) then
+        Append(F)
+    else
+        Rewrite(F);
+    Writeln(F, FormatDateTime('YYYYMMDD',Now)+','+username+','+Result);
+    CloseFile(F);
   finally
     Burn;
     Free;
+
   end;
 end;
 
