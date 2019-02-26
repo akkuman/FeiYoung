@@ -118,9 +118,10 @@ object Form1: TForm1
     TabOrder = 2
     object lblInfo: TLabel
       Left = 8
-      Height = 1
+      Height = 17
       Top = 0
-      Width = 1
+      Width = 93
+      Caption = 'QQ:1075768094'
       ParentColor = False
     end
   end
