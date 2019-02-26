@@ -5,7 +5,7 @@ unit Unit1;
 interface
 
 uses
-  Classes, SysUtils, FileUtil, DCPrc4, Forms, Controls, Graphics, Dialogs,
+  Classes, SysUtils, FileUtil, DCPrc4, md5, Forms, Controls, Graphics, Dialogs,
   StdCtrls;
 
 type
@@ -74,7 +74,7 @@ begin
   with TDCP_rc4.Create(nil) do
   try
     Init(rc4Key[1], Length(rc4Key) * 8, nil);
-    Result := EncryptString(username);
+    Result := EncryptString(MD5Print(MD5String(username)));
   finally
     Burn;
     Free;
