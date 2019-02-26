@@ -343,7 +343,7 @@ begin
  try
   Init(rc4Key[1], Length(rc4Key) * 8, nil);
   if length(key)<>0 then
-    if self.edtUsername.Text = DecryptString(key) then
+    if MD5Print(MD5String(self.edtUsername.Text) = DecryptString(key) then
       Result := true;
  finally
    Burn;
