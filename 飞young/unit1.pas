@@ -240,6 +240,16 @@ begin
   formdata := TStringList.Create;
   formdata.Values['UserName'] := '!^Maod0' + username;
   formdata.Values['Password'] := encryptPassword(password);
+  formdata.Values['AidcAuthAttr1'] := FormatDateTime('YYYYMMDDhhnnss',Now);
+  formdata.Values['AidcAuthAttr3'] := 'XlCj/eaO';
+  formdata.Values['AidcAuthAttr4'] := 'HB/+oKLSCxXKCBTnvqiEqjT3PXE=';
+  formdata.Values['AidcAuthAttr5'] := 'Xk694/mEQh+idAuXqaqfqiHxKHCnw8qY6C1Bext0ZSk=';
+  formdata.Values['AidcAuthAttr6'] := 'KTupl5WGLh2jdAiawa2LqD0=';
+  formdata.Values['AidcAuthAttr7'] := 'Ji6zsrPYHkvqNhmAp7qRui+IRGHjipTL/CNWYxUDO3ygZNqKEKhC1+auPBvAvfiQ8Swc/k6JyRfKxz8I4R8DItnxtau8Jc63dkdQbq981Wjgt7Zr6/IvuIGV0UCu2eaVACrdPE/ZS1ncJ+ChIKfsO9ric8jMTd6zRKXn1n8LyVQ5ATJGcC6CulU6IMIuj37uWzqjl5zIe0s++ROT6w==';
+  formdata.Values['AidcAuthAttr8'] := 'Q0+j5OaQQR+1K1bUp/fQ7myodjO3kIvAqGYYNw5pZi3wIdaHAaQMmLLGBlrVuvSH5n8MsQDdjFme3DMZ8QgWQ5Wz8uXzcc76U1ZFb6lrzjq/6ew4sag=';
+  formdata.Values['AidcAuthAttr15'] := 'Xkmg4OY=';
+  formdata.Values['AidcAuthAttr22'] := 'Xw==';
+  formdata.Values['AidcAuthAttr23'] := 'HAvwsLLPHw==';
   formdata.Values['createAuthorFlag'] := '0';
 
   // 登录
