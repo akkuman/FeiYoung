@@ -23,16 +23,17 @@ object Form1: TForm1
       Left = 8
       Height = 17
       Top = 4
-      Width = 29
-      Caption = 'code'
+      Width = 37
+      Caption = 'device'
       ParentColor = False
     end
-    object edtMachineCode: TEdit
+    object edtDeviceInfo: TEdit
       Left = 48
       Height = 25
       Top = 0
       Width = 157
       TabOrder = 0
+      Text = 'samsung;SM-G9250;7.0'
     end
     object lblAuthKey: TLabel
       Left = 8
@@ -118,10 +119,9 @@ object Form1: TForm1
     TabOrder = 2
     object lblInfo: TLabel
       Left = 8
-      Height = 17
+      Height = 1
       Top = 0
-      Width = 93
-      Caption = 'QQ:1075768094'
+      Width = 1
       ParentColor = False
     end
   end

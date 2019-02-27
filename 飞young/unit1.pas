@@ -5,7 +5,7 @@ unit Unit1;
 interface
 
 uses
-  Classes, SysUtils, FileUtil, DCPrc4, md5, Forms, Controls, Graphics,
+  Classes, SysUtils, FileUtil, DCPrc4, DCPbase64, md5, Forms, Controls, Graphics,
   Dialogs, StdCtrls, IniFiles, fphttpclient, RegExpr;
 
 type
@@ -17,7 +17,7 @@ type
     btnClick2Logoff: TButton;
     DCP_rc4_1: TDCP_rc4;
     edtAuthKey: TEdit;
-    edtMachineCode: TEdit;
+    edtDeviceInfo: TEdit;
     edtPassword: TEdit;
     edtUsername: TEdit;
     grpInfo: TGroupBox;
@@ -34,8 +34,9 @@ type
     procedure FormCreate(Sender: TObject);
     function getTodayOfMonth():Integer;
     function encryptPassword(password:string):string;
+    function encryptAuthAttr(infostr:string):string;
     procedure getRedirectURL(base_url:string);
-    procedure getLoginURL();
+    procedure getLoginINFO();
     procedure loginAction(username:string; password:string);
     procedure logoffAction(logoff_url:string);
     procedure showInfoFromINI(filename:string);
@@ -44,9 +45,12 @@ type
   private
     redirectURL: string;
     loginURL: string;
+    aidcAuthAttr15: string;
     loginINFO: string;
     logoffURL: string;
     logoffINFO: string;
+    ipaddr: string;
+    macaddr: string;
   public
 
   end;
@@ -180,6 +184,72 @@ begin
   Result := en_password;
 end;
 
+function TForm1.encryptAuthAttr(infostr:string):string;
+const
+  day_key: array[1..31,1..10] of byte = (
+    ($05,$03,$04,$08,$07,$02,$09,$06,$00,$01),
+    ($07,$08,$02,$09,$04,$06,$03,$01,$05,$00),
+    ($07,$09,$05,$01,$04,$02,$00,$03,$08,$06),
+    ($08,$07,$00,$06,$02,$05,$04,$01,$03,$09),
+    ($06,$02,$03,$05,$08,$01,$00,$04,$07,$09),
+    ($00,$03,$05,$02,$04,$08,$01,$06,$07,$09),
+    ($04,$01,$02,$08,$05,$00,$06,$09,$07,$03),
+    ($07,$01,$03,$04,$00,$08,$09,$02,$06,$05),
+    ($06,$09,$00,$08,$05,$03,$04,$01,$07,$02),
+    ($04,$05,$01,$06,$08,$09,$03,$07,$00,$02),
+    ($01,$06,$04,$08,$00,$09,$02,$03,$05,$07),
+    ($05,$00,$07,$02,$04,$08,$03,$01,$06,$09),
+    ($06,$09,$00,$04,$02,$08,$03,$01,$05,$07),
+    ($02,$09,$03,$00,$05,$01,$08,$06,$04,$07),
+    ($07,$00,$08,$02,$04,$03,$06,$05,$01,$09),
+    ($06,$03,$01,$08,$02,$05,$00,$09,$04,$07),
+    ($01,$00,$07,$09,$02,$03,$04,$05,$06,$08),
+    ($01,$04,$09,$08,$00,$05,$03,$06,$07,$02),
+    ($06,$08,$05,$02,$00,$09,$03,$04,$07,$01),
+    ($08,$07,$04,$06,$03,$09,$05,$00,$02,$01),
+    ($09,$02,$08,$03,$04,$01,$07,$06,$00,$05),
+    ($00,$05,$08,$03,$09,$02,$04,$01,$07,$06),
+    ($09,$07,$04,$05,$02,$01,$06,$00,$03,$08),
+    ($05,$01,$07,$04,$02,$03,$00,$08,$09,$06),
+    ($07,$04,$05,$01,$06,$02,$08,$09,$00,$03),
+    ($05,$09,$03,$06,$08,$02,$00,$07,$01,$04),
+    ($04,$09,$06,$05,$02,$08,$07,$01,$03,$00),
+    ($05,$08,$09,$02,$01,$07,$06,$03,$00,$04),
+    ($08,$03,$09,$05,$06,$00,$04,$07,$02,$01),
+    ($07,$05,$02,$08,$04,$01,$03,$09,$06,$00),
+    ($09,$00,$07,$02,$08,$04,$06,$01,$03,$05)
+   );
+var
+  day_num: Integer;
+  key: array[1..10] of byte;
+  rc4cipher: TDCP_rc4;
+  enRC4byte: array of byte;
+  //en_infostr: string;
+  en_size: Integer;
+  bytes_infostr: array of byte;
+begin
+  day_num := getTodayOfMonth();
+  key := day_key[day_num];
+  // string转为byte数组
+  bytes_infostr := bytesof(infostr);
+  // 设置outbuffer长度
+  setLength(enRC4byte, Length(infostr));
+  en_size := Sizeof(byte)*Length(enRC4byte);
+  // 加密
+  rc4cipher := TDCP_rc4.Create(nil);
+  try
+    rc4cipher.Init(key, Sizeof(key) * 8, nil);
+    rc4cipher.Encrypt(Pbytearray(bytes_infostr)^, Pbytearray(enRC4byte)^, en_size);
+    SetLength(Result,((Length(enRC4byte)+2) div 3) * 4);
+    Base64Encode(Pbytearray(enRC4byte), @Result[1], en_size);
+  finally
+    rc4cipher.Burn;
+    rc4cipher.Free;
+  end;
+
+  //Result := en_password;
+end;
+
 procedure TForm1.getRedirectURL(base_url: string);
 begin
   with TFPHttpClient.Create(Nil) do
@@ -194,7 +264,7 @@ begin
   end;
 end;
 
-procedure TForm1.getLoginURL();
+procedure TForm1.getLoginINFO();
 var
   re: TRegExpr;
   html: string;
@@ -212,6 +282,18 @@ begin
           if re.Exec(html) then
             self.loginURL := re.Match[1];
           re.Free;
+          re := TRegExpr.Create('<AidcAuthAttr15>(\S+?)</AidcAuthAttr15>');
+          if re.Exec(html) then
+            self.aidcAuthAttr15 := re.Match[1];
+          re.Free;
+          re := TRegExpr.Create('100\.64\.\d{1,3}\.\d{1,3}');
+          if re.Exec(html) then
+            self.ipaddr := re.Match[1];
+          re.Free;
+          re := TRegExpr.Create('(\w\w-){5}\w\w');
+          if re.Exec(html) then
+            self.macaddr := StringReplace(re.Match[1], '-', ':', [rfReplaceAll, rfIgnoreCase]);
+          re.Free;
         end;
     finally
       Free;
@@ -224,7 +306,10 @@ var
   re: TRegExpr;
   html: string;
   formdata: TStrings;
+  version: string = '1.0.12';
+  deviceINFO: string;
 begin
+  deviceINFO := self.edtDeviceInfo.Text;
   // 获取登录地址
   getRedirectURL('http://59.37.96.63:80');
   if Length(self.redirectURL)=0 then
@@ -232,7 +317,7 @@ begin
       self.lblInfo.Caption := '已联网，请勿再次登录';
       Exit;
     end;
-  getLoginURL();
+  getLoginINFO();
   if Length(self.loginURL)=0 then
     Exit;
 
@@ -241,16 +326,17 @@ begin
   formdata.Values['UserName'] := '!^Maod0' + username;
   formdata.Values['Password'] := encryptPassword(password);
   formdata.Values['AidcAuthAttr1'] := FormatDateTime('YYYYMMDDhhnnss',Now);
-  formdata.Values['AidcAuthAttr3'] := 'XlCj/eaO';
-  formdata.Values['AidcAuthAttr4'] := 'HB/+oKLSCxXKCBTnvqiEqjT3PXE=';
-  formdata.Values['AidcAuthAttr5'] := 'Xk694/mEQh+idAuXqaqfqiHxKHCnw8qY6C1Bext0ZSk=';
-  formdata.Values['AidcAuthAttr6'] := 'KTupl5WGLh2jdAiawa2LqD0=';
-  formdata.Values['AidcAuthAttr7'] := 'Ji6zsrPYHkvqNhmAp7qRui+IRGHjipTL/CNWYxUDO3ygZNqKEKhC1+auPBvAvfiQ8Swc/k6JyRfKxz8I4R8DItnxtau8Jc63dkdQbq981Wjgt7Zr6/IvuIGV0UCu2eaVACrdPE/ZS1ncJ+ChIKfsO9ric8jMTd6zRKXn1n8LyVQ5ATJGcC6CulU6IMIuj37uWzqjl5zIe0s++ROT6w==';
-  formdata.Values['AidcAuthAttr8'] := 'Q0+j5OaQQR+1K1bUp/fQ7myodjO3kIvAqGYYNw5pZi3wIdaHAaQMmLLGBlrVuvSH5n8MsQDdjFme3DMZ8QgWQ5Wz8uXzcc76U1ZFb6lrzjq/6ew4sag=';
-  formdata.Values['AidcAuthAttr15'] := 'Xkmg4OY=';
-  formdata.Values['AidcAuthAttr22'] := 'Xw==';
-  formdata.Values['AidcAuthAttr23'] := 'HAvwsLLPHw==';
+  formdata.Values['AidcAuthAttr3'] := encryptAuthAttr(version);
+  formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
+  formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('127.0.0.1;'+ self.ipaddr);
+  formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(UpperCase(self.macaddr));
+  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;',[self.macaddr]));
+  formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
+  formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
+  formdata.Values['AidcAuthAttr22'] := encryptAuthAttr('0');
+  formdata.Values['AidcAuthAttr23'] := encryptAuthAttr('success');
   formdata.Values['createAuthorFlag'] := '0';
+  //ShowMessage(formdata.GetText());
 
   // 登录
   with TFPHttpClient.Create(Nil) do
