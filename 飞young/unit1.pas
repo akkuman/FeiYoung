@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, DCPrc4, DCPbase64, md5, Forms, Controls, Graphics,
-  Dialogs, StdCtrls, IdHTTP, IniFiles, fphttpclient, RegExpr;
+  Dialogs, StdCtrls, IniFiles, fphttpclient, RegExpr;
 
 type
 
@@ -35,6 +35,8 @@ type
     function getTodayOfMonth():Integer;
     function encryptPassword(password:string):string;
     function encryptAuthAttr(infostr:string):string;
+    // 根据所给的分隔符生成随机MAC地址(小写)
+    function randomMAC(Separator: String): string;
     procedure getRedirectURL(base_url:string);
     procedure getLoginINFO();
     procedure loginAction(username:string; password:string);
@@ -117,6 +119,44 @@ var
 begin
   DeCodeDate (Date,YY,MM,DD);
   Result := DD;
+end;
+
+function TForm1.randomMAC(Separator: String): String;
+var Symbol: PChar;
+    MAC: String;
+    I: Integer;
+begin
+    Randomize;
+    MAC := '';
+    Symbol := '0123456789abcdef';
+    if Separator = '' then
+    begin
+        for I := 0 to 11 do
+            MAC := MAC + Symbol[Random(16)];
+    end
+    else if (Separator = '-') Or (Separator = ':') then
+    begin
+        for I := 0 to 11 do
+        begin
+            if (I > 0) And (I mod 2 = 0) then
+            begin
+                MAC := MAC + Separator + Symbol[Random(16)];
+            end
+            else
+                MAC := MAC + Symbol[Random(16)];
+        end;
+    end
+    else if Separator = '.' then
+        for I := 0 to 11 do
+        begin
+            if (I > 0) And (I mod 4 = 0) then
+            begin
+                MAC := MAC + Separator + Symbol[Random(16)];
+            end
+            else
+                MAC := MAC + Symbol[Random(16)];
+        end;
+    Result := MAC;
 end;
 
 function TForm1.encryptPassword(password: string): string;
@@ -331,7 +371,7 @@ begin
   formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
   formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr);
   formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(self.macaddr);
-  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [self.macaddr]));
+  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [randomMAC(':')]));
   formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
   formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
   formdata.Values['AidcAuthAttr22'] := encryptAuthAttr('0');
