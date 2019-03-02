@@ -23,7 +23,6 @@ type
     grpInfo: TGroupBox;
     grpAuthConfig: TGroupBox;
     grpLoginInfoConfig: TGroupBox;
-    IdHTTP1: TIdHTTP;
     lblInfo: TLabel;
     lblAuthKey: TLabel;
     lblMachineCode: TLabel;
@@ -34,7 +33,6 @@ type
     procedure edtAuthKeyChange(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     function getTodayOfMonth():Integer;
-    function EncodeURLElement(S: String): String;
     function encryptPassword(password:string):string;
     function encryptAuthAttr(infostr:string):string;
     procedure getRedirectURL(base_url:string);
@@ -119,44 +117,6 @@ var
 begin
   DeCodeDate (Date,YY,MM,DD);
   Result := DD;
-end;
-
-function TForm1.EncodeURLElement(S: String): String;
-Const
-  NotAllowed = [ ';', '/', '?', ':', '@', '=', '&', '#', '+', '_', '<', '>',
-                 '"', '%', '{', '}', '|', '\', '^', '~', '[', ']', '`', '!' ];
-
-var
-  i, o, l : Integer;
-  h: string[2];
-  P : PChar;
-  c: AnsiChar;
-begin
-  l:=Length(S);
-  If (l=0) then Exit;
-  SetLength(Result,l*3);
-  P:=Pchar(Result);
-  for I:=1 to L do
-    begin
-    C:=S[i];
-    O:=Ord(c);
-    if (O<=$20) or (O>=$7F) or (c in NotAllowed) then
-      begin
-      P^ := '%';
-      Inc(P);
-      h := IntToHex(Ord(c), 2);
-      p^ := h[1];
-      Inc(P);
-      p^ := h[2];
-      Inc(P);
-      end
-    else
-      begin
-      P^ := c;
-      Inc(p);
-      end;
-    end;
-  SetLength(Result,P-PChar(Result));
 end;
 
 function TForm1.encryptPassword(password: string): string;
@@ -344,9 +304,8 @@ end;
 procedure TForm1.loginAction(username: string; password: string);
 var
   re: TRegExpr;
-  html: TStringStream;
+  html: string;
   formdata: TStrings;
-  //formstr: string;
   version: string = '1.0.12';
   deviceINFO: string;
 begin
@@ -372,7 +331,6 @@ begin
   formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
   formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr);
   formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(self.macaddr);
-  ShowMessage(self.macaddr);
   formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [self.macaddr]));
   formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
   formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
@@ -380,72 +338,27 @@ begin
   formdata.Values['AidcAuthAttr23'] := encryptAuthAttr('success');
   formdata.Values['createAuthorFlag'] := '0';
 
-  //formstr := 'UserName=' + EncodeURLElement('!^Maod0' + username);
-  //formstr += '&Password=' + EncodeURLElement(encryptPassword(password));
-  //formstr += '&AidcAuthAttr1=' + EncodeURLElement(FormatDateTime('YYYYMMDDhhnnss',Now));
-  //formstr += '&AidcAuthAttr3=' + EncodeURLElement(encryptAuthAttr(version));
-  //formstr += '&AidcAuthAttr4=' + EncodeURLElement(encryptAuthAttr(deviceINFO));
-  //formstr += '&AidcAuthAttr5=' + EncodeURLElement(encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr));
-  //formstr += '&AidcAuthAttr6=' + EncodeURLElement(encryptAuthAttr(UpperCase(self.macaddr)));
-  //formstr += '&AidcAuthAttr7=' + EncodeURLElement(encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;',[self.macaddr])));
-  //formstr += '&AidcAuthAttr8=' + EncodeURLElement(encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content'));
-  //formstr += '&AidcAuthAttr15=' + EncodeURLElement(self.aidcAuthAttr15);
-  //formstr += '&AidcAuthAttr22=' + EncodeURLElement(encryptAuthAttr('0'));
-  //formstr += '&AidcAuthAttr23=' + EncodeURLElement(encryptAuthAttr('success'));
-  //formstr += '&createAuthorFlag=' + EncodeURLElement('0');
-
   // 登录
-  html := TStringStream.Create('');
-  try
-    IdHTTP1.Request.Connection := 'Keep-Alive';
-    IdHTTP1.Request.UserAgent := 'CDMA+WLAN(Maod)';
-    IdHTTP1.Request.Accept := '';
-    IdHTTP1.Request.AcceptEncoding := 'gzip';
-    IdHTTP1.HTTPOptions := [hoKeepOrigProtocol]; // 改成http1.1
-    IdHTTP1.ProtocolVersion := pv1_1;
-    IdHTTP1.Post(self.loginURL, formdata, html);
-    if IdHTTP1.ResponseCode = 200 then
-     begin
-       re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
-       if re.Exec(html.DataString) then
-         self.loginINFO := re.Match[1];
-       re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
-       if re.Exec(html.DataString) then
-         self.logoffURL := re.Match[1];
-       re.Free;
-     end;
-  finally
-   //HttpClient.Free;
-   formdata.Free;
-   html.Free;
+  with TFPHttpClient.Create(Nil) do
+  begin
+    try
+      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      html := FormPost(self.loginURL, formdata);
+      if ResponseStatusCode = 200 then
+        begin
+          re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
+          if re.Exec(html) then
+            self.loginINFO := re.Match[1];
+          re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
+          if re.Exec(html) then
+            self.logoffURL := re.Match[1];
+          re.Free;
+        end;
+    finally
+      Free;
+      formdata.Free;
+    end;
   end;
-
-
-
-
-  // 登录
-  //with TFPHttpClient.Create(Nil) do
-  //begin
-  //  try
-  //    AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
-  //    KeepConnection := true;
-  //    AddHeader('Accept-Encoding', 'gzip');
-  //    html := FormPost(self.loginURL, formstr);
-  //    if ResponseStatusCode = 200 then
-  //      begin
-  //        re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
-  //        if re.Exec(html) then
-  //          self.loginINFO := re.Match[1];
-  //        re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
-  //        if re.Exec(html) then
-  //          self.logoffURL := re.Match[1];
-  //        re.Free;
-  //      end;
-  //  finally
-  //    Free;
-  //    //formdata.Free;
-  //  end;
-  //end;
 end;
 
 procedure TForm1.logoffAction(logoff_url: string);
