@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, DCPrc4, DCPbase64, md5, Forms, Controls, Graphics,
-  Dialogs, StdCtrls, IniFiles, fphttpclient, RegExpr;
+  Dialogs, StdCtrls, IdHTTP, IniFiles, fphttpclient, RegExpr;
 
 type
 
@@ -23,6 +23,7 @@ type
     grpInfo: TGroupBox;
     grpAuthConfig: TGroupBox;
     grpLoginInfoConfig: TGroupBox;
+    IdHTTP1: TIdHTTP;
     lblInfo: TLabel;
     lblAuthKey: TLabel;
     lblMachineCode: TLabel;
@@ -121,7 +122,6 @@ begin
 end;
 
 function TForm1.EncodeURLElement(S: String): String;
-
 Const
   NotAllowed = [ ';', '/', '?', ':', '@', '=', '&', '#', '+', '_', '<', '>',
                  '"', '%', '{', '}', '|', '\', '^', '~', '[', ']', '`', '!' ];
@@ -315,7 +315,7 @@ begin
     try
       AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
       url := self.redirectURL + '&aidcauthtype=0';
-      html := Post(url);
+      html := Get(url);
       if ResponseStatusCode = 200 then
         begin
           re := TRegExpr.Create('\<LoginURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LoginURL\>');
@@ -344,9 +344,9 @@ end;
 procedure TForm1.loginAction(username: string; password: string);
 var
   re: TRegExpr;
-  html: string;
-  //formdata: TStrings;
-  formstr: string;
+  html: TStringStream;
+  formdata: TStrings;
+  //formstr: string;
   version: string = '1.0.12';
   deviceINFO: string;
 begin
@@ -363,60 +363,89 @@ begin
     Exit;
 
   //ShowMessage(self.aidcAuthAttr15+'|'+self.macaddr+'|'+self.ipaddr);
-  // 构造formdata
-  //formdata := TStringList.Create;
-  //formdata.Values['UserName'] := '!^Maod0' + username;
-  //formdata.Values['Password'] := encryptPassword(password);
-  //formdata.Values['AidcAuthAttr1'] := FormatDateTime('YYYYMMDDhhnnss',Now);
-  //formdata.Values['AidcAuthAttr3'] := encryptAuthAttr(version);
-  //formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
-  //formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr);
-  //formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(UpperCase(self.macaddr));
-  //formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;',[self.macaddr]));
-  //formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
-  //formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
-  //formdata.Values['AidcAuthAttr22'] := encryptAuthAttr('0');
-  //formdata.Values['AidcAuthAttr23'] := encryptAuthAttr('success');
-  //formdata.Values['createAuthorFlag'] := '0';
-  //ShowMessage(formdata.GetText());
+  //构造formdata
+  formdata := TStringList.Create;
+  formdata.Values['UserName'] := '!^Maod0' + username;
+  formdata.Values['Password'] := encryptPassword(password);
+  formdata.Values['AidcAuthAttr1'] := FormatDateTime('YYYYMMDDhhnnss',Now);
+  formdata.Values['AidcAuthAttr3'] := encryptAuthAttr(version);
+  formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
+  formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr);
+  formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(self.macaddr);
+  ShowMessage(self.macaddr);
+  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [self.macaddr]));
+  formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
+  formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
+  formdata.Values['AidcAuthAttr22'] := encryptAuthAttr('0');
+  formdata.Values['AidcAuthAttr23'] := encryptAuthAttr('success');
+  formdata.Values['createAuthorFlag'] := '0';
 
-  formstr := 'UserName=' + EncodeURLElement('!^Maod0' + username);
-  formstr += '&Password=' + EncodeURLElement(encryptPassword(password));
-  formstr += '&AidcAuthAttr1=' + EncodeURLElement(FormatDateTime('YYYYMMDDhhnnss',Now));
-  formstr += '&AidcAuthAttr3=' + EncodeURLElement(encryptAuthAttr(version));
-  formstr += '&AidcAuthAttr4=' + EncodeURLElement(encryptAuthAttr(deviceINFO));
-  formstr += '&AidcAuthAttr5=' + EncodeURLElement(encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr));
-  formstr += '&AidcAuthAttr6=' + EncodeURLElement(encryptAuthAttr(UpperCase(self.macaddr)));
-  formstr += '&AidcAuthAttr7=' + EncodeURLElement(encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;',[self.macaddr])));
-  formstr += '&AidcAuthAttr8=' + EncodeURLElement(encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content'));
-  formstr += '&AidcAuthAttr15=' + EncodeURLElement(self.aidcAuthAttr15);
-  formstr += '&AidcAuthAttr22=' + EncodeURLElement(encryptAuthAttr('0'));
-  formstr += '&AidcAuthAttr23=' + EncodeURLElement(encryptAuthAttr('success'));
-  formstr += '&createAuthorFlag=' + EncodeURLElement('0');
+  //formstr := 'UserName=' + EncodeURLElement('!^Maod0' + username);
+  //formstr += '&Password=' + EncodeURLElement(encryptPassword(password));
+  //formstr += '&AidcAuthAttr1=' + EncodeURLElement(FormatDateTime('YYYYMMDDhhnnss',Now));
+  //formstr += '&AidcAuthAttr3=' + EncodeURLElement(encryptAuthAttr(version));
+  //formstr += '&AidcAuthAttr4=' + EncodeURLElement(encryptAuthAttr(deviceINFO));
+  //formstr += '&AidcAuthAttr5=' + EncodeURLElement(encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr));
+  //formstr += '&AidcAuthAttr6=' + EncodeURLElement(encryptAuthAttr(UpperCase(self.macaddr)));
+  //formstr += '&AidcAuthAttr7=' + EncodeURLElement(encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;',[self.macaddr])));
+  //formstr += '&AidcAuthAttr8=' + EncodeURLElement(encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content'));
+  //formstr += '&AidcAuthAttr15=' + EncodeURLElement(self.aidcAuthAttr15);
+  //formstr += '&AidcAuthAttr22=' + EncodeURLElement(encryptAuthAttr('0'));
+  //formstr += '&AidcAuthAttr23=' + EncodeURLElement(encryptAuthAttr('success'));
+  //formstr += '&createAuthorFlag=' + EncodeURLElement('0');
 
   // 登录
-  with TFPHttpClient.Create(Nil) do
-  begin
-    try
-      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
-      KeepConnection := true;
-      AddHeader('Accept-Encoding', 'gzip');
-      html := FormPost(self.loginURL, formstr);
-      if ResponseStatusCode = 200 then
-        begin
-          re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
-          if re.Exec(html) then
-            self.loginINFO := re.Match[1];
-          re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
-          if re.Exec(html) then
-            self.logoffURL := re.Match[1];
-          re.Free;
-        end;
-    finally
-      Free;
-      //formdata.Free;
-    end;
+  html := TStringStream.Create('');
+  try
+    IdHTTP1.Request.Connection := 'Keep-Alive';
+    IdHTTP1.Request.UserAgent := 'CDMA+WLAN(Maod)';
+    IdHTTP1.Request.Accept := '';
+    IdHTTP1.Request.AcceptEncoding := 'gzip';
+    IdHTTP1.HTTPOptions := [hoKeepOrigProtocol]; // 改成http1.1
+    IdHTTP1.ProtocolVersion := pv1_1;
+    IdHTTP1.Post(self.loginURL, formdata, html);
+    if IdHTTP1.ResponseCode = 200 then
+     begin
+       re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
+       if re.Exec(html.DataString) then
+         self.loginINFO := re.Match[1];
+       re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
+       if re.Exec(html.DataString) then
+         self.logoffURL := re.Match[1];
+       re.Free;
+     end;
+  finally
+   //HttpClient.Free;
+   formdata.Free;
+   html.Free;
   end;
+
+
+
+
+  // 登录
+  //with TFPHttpClient.Create(Nil) do
+  //begin
+  //  try
+  //    AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+  //    KeepConnection := true;
+  //    AddHeader('Accept-Encoding', 'gzip');
+  //    html := FormPost(self.loginURL, formstr);
+  //    if ResponseStatusCode = 200 then
+  //      begin
+  //        re := TRegExpr.Create('\<ReplyMessage\>(\S+?)\<\/ReplyMessage\>');
+  //        if re.Exec(html) then
+  //          self.loginINFO := re.Match[1];
+  //        re := TRegExpr.Create('\<LogoffURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LogoffURL\>');
+  //        if re.Exec(html) then
+  //          self.logoffURL := re.Match[1];
+  //        re.Free;
+  //      end;
+  //  finally
+  //    Free;
+  //    //formdata.Free;
+  //  end;
+  //end;
 end;
 
 procedure TForm1.logoffAction(logoff_url: string);
