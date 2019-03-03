@@ -53,6 +53,7 @@ type
     logoffINFO: string;
     ipaddr: string;
     macaddr: string;
+    truemac: string;
   public
 
   end;
@@ -65,6 +66,11 @@ implementation
 {$R *.lfm}
 
 { TForm1 }
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  showInfoFromINI('config.ini');
+end;
 
 procedure TForm1.btnClick2LoginClick(Sender: TObject);
 begin
@@ -106,11 +112,6 @@ begin
       self.btnClick2Login.Enabled:=True;
       self.btnClick2Logoff.Enabled:=True;
     end;
-end;
-
-procedure TForm1.FormCreate(Sender: TObject);
-begin
-  showInfoFromINI('config.ini');
 end;
 
 function TForm1.getTodayOfMonth(): Integer;
@@ -349,6 +350,10 @@ var
   version: string = '1.0.12';
   deviceINFO: string;
 begin
+  // 获取一个truemac
+  if self.truemac = '' then
+    self.truemac := randomMAC(':');
+  // 获取设备信息
   deviceINFO := self.edtDeviceInfo.Text;
   // 获取登录地址
   getRedirectURL('http://59.37.96.63:80');
@@ -371,7 +376,7 @@ begin
   formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
   formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr);
   formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(self.macaddr);
-  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [randomMAC(':')]));
+  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [self.truemac]));
   formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
   formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
   formdata.Values['AidcAuthAttr22'] := encryptAuthAttr('0');
@@ -442,6 +447,7 @@ begin
     password := INI.ReadString(ASECTION, 'password', '');
     key      := INI.ReadString(ASECTION, 'key', '');
     self.logoffURL := INI.ReadString(ASECTION, 'logoff', '');
+    self.truemac := INI.ReadString(ASECTION, 'truemac', '');
 
     self.edtUsername.Text := username;
     self.edtPassword.Text := password;
@@ -463,6 +469,7 @@ begin
     INI.WriteString(ASECTION, 'password', self.edtPassword.Text);
     INI.WriteString(ASECTION, 'key', self.edtAuthKey.Text);
     INI.WriteString(ASECTION, 'logoff', self.logoffURL);
+    INI.WriteString(ASECTION, 'truemac', self.truemac);
     INI.UpdateFile;
   finally
     INI.Free;
