@@ -203,7 +203,7 @@ begin
   with TFPHttpClient.Create(Nil) do
   begin
     try
-      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      AddHeader('User-Agent', 'CDMA+WLAN(Macos)');
       url := self.redirectURL + '&aidcauthtype=0';
       html := Post(url);
       if ResponseStatusCode = 200 then
@@ -238,15 +238,17 @@ begin
 
   // 构造formdata
   formdata := TStringList.Create;
-  formdata.Values['UserName'] := '!^Maod0' + username;
+  formdata.Values['button'] := 'Login';
+  formdata.Values['UserName'] := '!^A6EA0' + username;
   formdata.Values['Password'] := encryptPassword(password);
-  formdata.Values['createAuthorFlag'] := '0';
+  formdata.Values['FNAME'] := '0';
+  formdata.Values['OriginatingServer'] := 'http://www.sina.com.cn/';
 
   // 登录
   with TFPHttpClient.Create(Nil) do
   begin
     try
-      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      AddHeader('User-Agent', 'CDMA+WLAN(Macos)');
       html := FormPost(self.loginURL, formdata);
       if ResponseStatusCode = 200 then
         begin
@@ -274,7 +276,7 @@ begin
   with TFPHttpClient.Create(Nil) do
   begin
     try
-      AddHeader('User-Agent', 'CDMA+WLAN(Maod)');
+      AddHeader('User-Agent', 'CDMA+WLAN(Macos)');
       html := Get(logoff_url);
       if ResponseStatusCode = 200 then
         begin
