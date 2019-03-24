@@ -5,7 +5,7 @@ unit Unit1;
 interface
 
 uses
-  Classes, SysUtils, FileUtil, DCPrc4, md5, Forms, Controls, Graphics,
+  Classes, SysUtils, FileUtil, DCPrc4, DCPbase64, md5, Forms, Controls, Graphics,
   Dialogs, StdCtrls, IniFiles, fphttpclient, RegExpr;
 
 type
@@ -17,7 +17,7 @@ type
     btnClick2Logoff: TButton;
     DCP_rc4_1: TDCP_rc4;
     edtAuthKey: TEdit;
-    edtMachineCode: TEdit;
+    edtDeviceInfo: TEdit;
     edtPassword: TEdit;
     edtUsername: TEdit;
     grpInfo: TGroupBox;
@@ -34,8 +34,11 @@ type
     procedure FormCreate(Sender: TObject);
     function getTodayOfMonth():Integer;
     function encryptPassword(password:string):string;
+    function encryptAuthAttr(infostr:string):string;
+    // 根据所给的分隔符生成随机MAC地址(小写)
+    function randomMAC(Separator: String): string;
     procedure getRedirectURL(base_url:string);
-    procedure getLoginURL();
+    procedure getLoginINFO();
     procedure loginAction(username:string; password:string);
     procedure logoffAction(logoff_url:string);
     procedure showInfoFromINI(filename:string);
@@ -44,9 +47,13 @@ type
   private
     redirectURL: string;
     loginURL: string;
+    aidcAuthAttr15: string;
     loginINFO: string;
     logoffURL: string;
     logoffINFO: string;
+    ipaddr: string;
+    macaddr: string;
+    truemac: string;
   public
 
   end;
@@ -59,6 +66,11 @@ implementation
 {$R *.lfm}
 
 { TForm1 }
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  showInfoFromINI('config.ini');
+end;
 
 procedure TForm1.btnClick2LoginClick(Sender: TObject);
 begin
@@ -102,11 +114,6 @@ begin
     end;
 end;
 
-procedure TForm1.FormCreate(Sender: TObject);
-begin
-  showInfoFromINI('config.ini');
-end;
-
 function TForm1.getTodayOfMonth(): Integer;
 var
   YY,MM,DD : Word;
@@ -115,40 +122,78 @@ begin
   Result := DD;
 end;
 
+function TForm1.randomMAC(Separator: String): String;
+var Symbol: PChar;
+    MAC: String;
+    I: Integer;
+begin
+    Randomize;
+    MAC := '';
+    Symbol := '0123456789abcdef';
+    if Separator = '' then
+    begin
+        for I := 0 to 11 do
+            MAC := MAC + Symbol[Random(16)];
+    end
+    else if (Separator = '-') Or (Separator = ':') then
+    begin
+        for I := 0 to 11 do
+        begin
+            if (I > 0) And (I mod 2 = 0) then
+            begin
+                MAC := MAC + Separator + Symbol[Random(16)];
+            end
+            else
+                MAC := MAC + Symbol[Random(16)];
+        end;
+    end
+    else if Separator = '.' then
+        for I := 0 to 11 do
+        begin
+            if (I > 0) And (I mod 4 = 0) then
+            begin
+                MAC := MAC + Separator + Symbol[Random(16)];
+            end
+            else
+                MAC := MAC + Symbol[Random(16)];
+        end;
+    Result := MAC;
+end;
+
 function TForm1.encryptPassword(password: string): string;
 const
   day_key: array[1..31,1..10] of byte = (
-    ($01,$05,$09,$06,$08,$02,$04,$00,$07,$03),
-    ($04,$05,$01,$09,$02,$08,$03,$07,$06,$00),
-    ($01,$08,$00,$03,$07,$09,$06,$02,$05,$04),
-    ($00,$05,$01,$07,$08,$04,$09,$02,$03,$06),
-    ($04,$07,$06,$08,$01,$00,$09,$02,$03,$05),
-    ($02,$06,$07,$01,$09,$00,$04,$08,$05,$03),
-    ($05,$06,$09,$02,$07,$00,$08,$04,$01,$03),
-    ($03,$02,$01,$09,$08,$00,$07,$04,$05,$06),
-    ($07,$00,$02,$01,$06,$05,$08,$03,$04,$09),
-    ($02,$07,$03,$00,$01,$08,$04,$09,$05,$06),
-    ($07,$08,$09,$05,$06,$04,$03,$01,$00,$02),
-    ($05,$09,$06,$01,$00,$02,$04,$08,$07,$03),
-    ($04,$02,$09,$00,$01,$07,$03,$05,$06,$08),
-    ($01,$07,$04,$03,$02,$08,$06,$09,$00,$05),
-    ($09,$03,$08,$02,$04,$05,$01,$00,$07,$06),
-    ($04,$06,$03,$09,$02,$05,$01,$00,$07,$08),
-    ($05,$06,$09,$03,$02,$07,$00,$08,$01,$04),
-    ($07,$06,$08,$03,$04,$00,$05,$09,$01,$02),
-    ($08,$05,$06,$04,$03,$02,$09,$07,$00,$01),
-    ($06,$00,$04,$01,$07,$02,$08,$09,$05,$03),
-    ($07,$05,$08,$04,$00,$01,$06,$03,$02,$09),
-    ($04,$07,$05,$09,$01,$08,$06,$02,$03,$00),
-    ($02,$04,$07,$09,$00,$01,$08,$05,$06,$03),
-    ($02,$09,$05,$08,$04,$00,$06,$03,$07,$01),
-    ($06,$05,$04,$07,$01,$00,$09,$03,$02,$08),
-    ($00,$03,$05,$09,$04,$07,$08,$02,$01,$06),
-    ($09,$03,$08,$07,$02,$05,$06,$01,$04,$00),
-    ($02,$07,$03,$01,$04,$09,$05,$00,$06,$08),
-    ($08,$01,$07,$05,$06,$00,$04,$02,$03,$09),
-    ($05,$06,$02,$04,$07,$00,$03,$08,$09,$01),
-    ($05,$07,$06,$02,$00,$04,$01,$08,$03,$09)
+  ($00,$04,$02,$08,$06,$09,$05,$01,$07,$03),
+  ($04,$05,$01,$09,$02,$08,$03,$07,$06,$00),
+  ($02,$06,$09,$07,$03,$00,$08,$01,$05,$04),
+  ($02,$09,$04,$08,$07,$01,$05,$00,$03,$06),
+  ($02,$09,$00,$01,$08,$06,$07,$04,$03,$05),
+  ($08,$04,$00,$09,$01,$07,$06,$02,$05,$03),
+  ($04,$08,$00,$07,$02,$09,$06,$05,$01,$03),
+  ($04,$07,$00,$08,$09,$01,$02,$03,$05,$06),
+  ($03,$08,$05,$06,$01,$02,$00,$07,$04,$09),
+  ($09,$04,$08,$01,$00,$03,$07,$02,$05,$06),
+  ($01,$03,$04,$06,$05,$09,$08,$07,$00,$02),
+  ($08,$04,$02,$00,$01,$06,$09,$05,$07,$03),
+  ($05,$03,$07,$01,$00,$09,$02,$04,$06,$08),
+  ($09,$06,$08,$02,$03,$04,$07,$01,$00,$05),
+  ($00,$01,$05,$04,$02,$08,$03,$09,$07,$06),
+  ($00,$01,$05,$02,$09,$03,$06,$04,$07,$08),
+  ($08,$00,$07,$02,$03,$09,$06,$05,$01,$04),
+  ($09,$05,$00,$04,$03,$08,$06,$07,$01,$02),
+  ($07,$09,$02,$03,$04,$06,$05,$08,$00,$01),
+  ($09,$08,$02,$07,$01,$04,$00,$06,$05,$03),
+  ($03,$06,$01,$00,$04,$08,$05,$07,$02,$09),
+  ($04,$07,$05,$09,$01,$08,$06,$02,$03,$00),
+  ($05,$08,$01,$00,$09,$07,$04,$02,$06,$03),
+  ($03,$06,$00,$04,$08,$05,$09,$02,$07,$01),
+  ($03,$09,$00,$01,$07,$04,$05,$06,$02,$08),
+  ($02,$08,$07,$04,$09,$05,$03,$00,$01,$06),
+  ($09,$03,$08,$07,$02,$05,$06,$01,$04,$00),
+  ($00,$05,$09,$04,$01,$03,$07,$02,$06,$08),
+  ($02,$04,$00,$06,$05,$07,$01,$08,$03,$09),
+  ($08,$03,$00,$07,$04,$02,$06,$05,$09,$01),
+  ($08,$01,$04,$00,$02,$06,$07,$05,$03,$09)
    );
 var
   day_num: Integer;
@@ -180,6 +225,72 @@ begin
   Result := Copy(en_password, 9, 16);
 end;
 
+function TForm1.encryptAuthAttr(infostr:string):string;
+const
+  day_key: array[1..31,1..10] of byte = (
+    ($05,$03,$04,$08,$07,$02,$09,$06,$00,$01),
+    ($07,$08,$02,$09,$04,$06,$03,$01,$05,$00),
+    ($07,$09,$05,$01,$04,$02,$00,$03,$08,$06),
+    ($08,$07,$00,$06,$02,$05,$04,$01,$03,$09),
+    ($06,$02,$03,$05,$08,$01,$00,$04,$07,$09),
+    ($00,$03,$05,$02,$04,$08,$01,$06,$07,$09),
+    ($04,$01,$02,$08,$05,$00,$06,$09,$07,$03),
+    ($07,$01,$03,$04,$00,$08,$09,$02,$06,$05),
+    ($06,$09,$00,$08,$05,$03,$04,$01,$07,$02),
+    ($04,$05,$01,$06,$08,$09,$03,$07,$00,$02),
+    ($01,$06,$04,$08,$00,$09,$02,$03,$05,$07),
+    ($05,$00,$07,$02,$04,$08,$03,$01,$06,$09),
+    ($06,$09,$00,$04,$02,$08,$03,$01,$05,$07),
+    ($02,$09,$03,$00,$05,$01,$08,$06,$04,$07),
+    ($07,$00,$08,$02,$04,$03,$06,$05,$01,$09),
+    ($06,$03,$01,$08,$02,$05,$00,$09,$04,$07),
+    ($01,$00,$07,$09,$02,$03,$04,$05,$06,$08),
+    ($01,$04,$09,$08,$00,$05,$03,$06,$07,$02),
+    ($06,$08,$05,$02,$00,$09,$03,$04,$07,$01),
+    ($08,$07,$04,$06,$03,$09,$05,$00,$02,$01),
+    ($09,$02,$08,$03,$04,$01,$07,$06,$00,$05),
+    ($00,$05,$08,$03,$09,$02,$04,$01,$07,$06),
+    ($09,$07,$04,$05,$02,$01,$06,$00,$03,$08),
+    ($05,$01,$07,$04,$02,$03,$00,$08,$09,$06),
+    ($07,$04,$05,$01,$06,$02,$08,$09,$00,$03),
+    ($05,$09,$03,$06,$08,$02,$00,$07,$01,$04),
+    ($04,$09,$06,$05,$02,$08,$07,$01,$03,$00),
+    ($05,$08,$09,$02,$01,$07,$06,$03,$00,$04),
+    ($08,$03,$09,$05,$06,$00,$04,$07,$02,$01),
+    ($07,$05,$02,$08,$04,$01,$03,$09,$06,$00),
+    ($09,$00,$07,$02,$08,$04,$06,$01,$03,$05)
+   );
+var
+  day_num: Integer;
+  key: array[1..10] of byte;
+  rc4cipher: TDCP_rc4;
+  enRC4byte: array of byte;
+  //en_infostr: string;
+  en_size: Integer;
+  bytes_infostr: array of byte;
+begin
+  day_num := getTodayOfMonth();
+  key := day_key[day_num];
+  // string转为byte数组
+  bytes_infostr := bytesof(infostr);
+  // 设置outbuffer长度
+  setLength(enRC4byte, Length(infostr));
+  en_size := Sizeof(byte)*Length(enRC4byte);
+  // 加密
+  rc4cipher := TDCP_rc4.Create(nil);
+  try
+    rc4cipher.Init(key, Sizeof(key) * 8, nil);
+    rc4cipher.Encrypt(Pbytearray(bytes_infostr)^, Pbytearray(enRC4byte)^, en_size);
+    SetLength(Result,((Length(enRC4byte)+2) div 3) * 4);
+    Base64Encode(Pbytearray(enRC4byte), @Result[1], en_size);
+  finally
+    rc4cipher.Burn;
+    rc4cipher.Free;
+  end;
+
+  //Result := en_password;
+end;
+
 procedure TForm1.getRedirectURL(base_url: string);
 begin
   with TFPHttpClient.Create(Nil) do
@@ -194,7 +305,7 @@ begin
   end;
 end;
 
-procedure TForm1.getLoginURL();
+procedure TForm1.getLoginINFO();
 var
   re: TRegExpr;
   html: string;
@@ -205,12 +316,24 @@ begin
     try
       AddHeader('User-Agent', 'CDMA+WLAN(Mios)');
       url := self.redirectURL + '&aidcauthtype=0';
-      html := Post(url);
+      html := Get(url);
       if ResponseStatusCode = 200 then
         begin
           re := TRegExpr.Create('\<LoginURL\>\<\!\[CDATA\[(\S+?)\]\]\>\<\/LoginURL\>');
           if re.Exec(html) then
             self.loginURL := re.Match[1];
+          re.Free;
+          re := TRegExpr.Create('<AidcAuthAttr15>(\S+?)</AidcAuthAttr15>');
+          if re.Exec(html) then
+            self.aidcAuthAttr15 := re.Match[1];
+          re.Free;
+          re := TRegExpr.Create('100\.64\.\d{1,3}\.\d{1,3}');
+          if re.Exec(html) then
+            self.ipaddr := re.Match[0];
+          re.Free;
+          re := TRegExpr.Create('(\w\w\-){5}\w\w');
+          if re.Exec(html) then
+            self.macaddr := StringReplace(re.Match[0], '-', ':', [rfReplaceAll, rfIgnoreCase]);
           re.Free;
         end;
     finally
@@ -224,7 +347,14 @@ var
   re: TRegExpr;
   html: string;
   formdata: TStrings;
+  version: string = '1.0.12';
+  deviceINFO: string;
 begin
+  // 获取一个truemac
+  if self.truemac = '' then
+    self.truemac := randomMAC(':');
+  // 获取设备信息
+  deviceINFO := self.edtDeviceInfo.Text;
   // 获取登录地址
   getRedirectURL('http://59.37.96.63:80');
   if Length(self.redirectURL)=0 then
@@ -232,14 +362,30 @@ begin
       self.lblInfo.Caption := '已联网，请勿再次登录';
       Exit;
     end;
-  getLoginURL();
+  getLoginINFO();
   if Length(self.loginURL)=0 then
     Exit;
 
-  // 构造formdata
+  //ShowMessage(self.aidcAuthAttr15+'|'+self.macaddr+'|'+self.ipaddr);
+  //构造formdata
   formdata := TStringList.Create;
+<<<<<<< HEAD
   formdata.Values['UserName'] := '!^Iqnd0' + username;
   formdata.Values['PassWord'] := encryptPassword(password);
+=======
+  formdata.Values['UserName'] := '!^Maod0' + username;
+  formdata.Values['Password'] := encryptPassword(password);
+  formdata.Values['AidcAuthAttr1'] := FormatDateTime('YYYYMMDDhhnnss',Now);
+  formdata.Values['AidcAuthAttr3'] := encryptAuthAttr(version);
+  formdata.Values['AidcAuthAttr4'] := encryptAuthAttr(deviceINFO);
+  formdata.Values['AidcAuthAttr5'] := encryptAuthAttr('10.0.8.1;127.0.0.1;'+ self.ipaddr);
+  formdata.Values['AidcAuthAttr6'] := encryptAuthAttr(self.macaddr);
+  formdata.Values['AidcAuthAttr7'] := encryptAuthAttr(Format('IP address       HW type     Flags       HW address            Mask     Device;100.64.0.1       0x1         0x2         %s     *        wlan0;', [self.truemac]));
+  formdata.Values['AidcAuthAttr8'] := encryptAuthAttr(',1071,-1,not matcher content;,1076,-1,not matcher content;,1075,-1,not matcher content');
+  formdata.Values['AidcAuthAttr15'] := self.aidcAuthAttr15;
+  formdata.Values['AidcAuthAttr22'] := encryptAuthAttr('0');
+  formdata.Values['AidcAuthAttr23'] := encryptAuthAttr('success');
+>>>>>>> v2.3
   formdata.Values['createAuthorFlag'] := '0';
 
   // 登录
@@ -306,6 +452,7 @@ begin
     password := INI.ReadString(ASECTION, 'password', '');
     key      := INI.ReadString(ASECTION, 'key', '');
     self.logoffURL := INI.ReadString(ASECTION, 'logoff', '');
+    self.truemac := INI.ReadString(ASECTION, 'truemac', '');
 
     self.edtUsername.Text := username;
     self.edtPassword.Text := password;
@@ -327,6 +474,7 @@ begin
     INI.WriteString(ASECTION, 'password', self.edtPassword.Text);
     INI.WriteString(ASECTION, 'key', self.edtAuthKey.Text);
     INI.WriteString(ASECTION, 'logoff', self.logoffURL);
+    INI.WriteString(ASECTION, 'truemac', self.truemac);
     INI.UpdateFile;
   finally
     INI.Free;
